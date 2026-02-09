@@ -1,12 +1,32 @@
         .setcpu "65C02"
 
 ; ACIA registers
+; 68B50 
 
 ACIA_BASE    = $7F00
-ACIA_DATA    = ACIA_BASE
-ACIA_STATUS  = ACIA_BASE + 1
-ACIA_COMMAND = ACIA_BASE + 2
-ACIA_CONTROL = ACIA_BASE + 3
+ACIA_CTRL_STATUS = ACIA_BASE            ; CTRL:RWB=0 STATUS:RWB=1
+ACIA_TX_RX       = ACIA_BASE + 1        ; TRANSMIT:RWB=0 RECEIVE:RWB=1
+
+ACIA_CTRL_CR0     = %00000001           ; Counter divide bits
+ACIA_CTRL_CR1     = %00000010
+ACIA_CTRL_WS1     = %00000100           ; Word Select bits
+ACIA_CTRL_WS2     = %00001000           ; 
+ACIA_CTRL_WS3     = %00010000           ;
+ACIA_CTRL_TXCTRL1 = %00100000           ; Transmit Xontrol
+ACIA_CTRL_TXCTRL2 = %01000000
+ACIA_CTRL_RXINTEN = %10000000           ; Revieve Interrupt Enable
+
+ACIA_RESET        = %00000011
+ACIA_8N1          = %00010100
+
+ACIA_STATUS_RDRF  = %00000001           ; Receive Data Register Full
+ACIA_STATUS_TDRE  = %00000010           ; Transmit Data Register Empty
+ACIA_STATUS_DCD   = %00000100           ; Data Carrier Detect
+ACIA_STATUS_CTS   = %00001000           ; Clear to Send
+ACIA_STATUS_FE    = %00010000           ; Framing Error
+ACIA_STATUS_OVRN  = %00100000           ; Overrun Error
+ACIA_STATUS_PE    = %01000000           ; Parity Error
+ACIA_STATUS_IRQ   = %10000000           ; State of IRQ Output of ACIA
 
         .segment "VECTORS"
 
@@ -19,30 +39,16 @@ ACIA_CONTROL = ACIA_BASE + 3
 DUMMY_vec:
         RTI
 
+;======= START =========================================
 RES_vec:
 main:
         CLD             ; Clear Decimal
         LDX #$FF        ; Reset stack
         TXS
 
-; acia_init   
-        lda #0
-        sta ACIA_STATUS ; reset
-        jsr tx_delay
-
-        lda #%00001011  ; TX_INT_DISABLE_RTS_LOW
-                        ; RX_INT_DISABLE
-                        ; DTR_LOW 
-        sta ACIA_COMMAND
-        nop
-
-        lda #%00011110  ; baud 9600, use crystal for clk
-        sta ACIA_CONTROL
-        nop
-
+        jsr acia_init
 
 ; Write Hello World message
-
         ldx #0
 send_loop:
         lda msg_hello,x
@@ -55,51 +61,53 @@ done:
         
 ; receive character in a loop and write back to acia
 rx_loop:
-        lda ACIA_STATUS 
-        and #$08        ; bit 3 Receiver Data Register Full
-        beq rx_loop     ; keep looping till receive
+        lda ACIA_CTRL_STATUS 
+        and #ACIA_STATUS_RDRF   ; Receiver Data Register Full
+        beq rx_loop             ; keep looping till receive
+        ; got something
+        lda ACIA_TX_RX          ; get data
 
-                        ; got something
-        lda ACIA_DATA   ; get data
-        jsr send_char
-        ;nop
+        jsr send_char           ; write it back out
         jmp rx_loop
 
+;======= END ===========================================
 
-; subroutine to send 1 char
-send_char:
+;-------------------------------------------------------
+; Initialise ACIA to 8N1 9600 baud
+acia_init:
         pha
-tx_wait:
+        ; 68B50 can do a SW reset
+        lda #ACIA_RESET
+        sta ACIA_CTRL_STATUS ; reset
         nop
         nop
         nop
         nop
-        nop
-        nop
-        lda ACIA_STATUS ; Wait for Transmit Data Register Empty
-        and #$10        ; bit 4 
-        beq tx_wait     ; will never get 0 status because of HW bug
+        lda #0
+        sta ACIA_CTRL_STATUS ; end reset sequence
 
-        jsr tx_delay    ; delay as wait won't work
-
+        ; with external baud rate generator : RxCLK and TxCLK are 153600, giving DIV16=9600
+        lda #(ACIA_8N1 | ACIA_CTRL_CR0)     ; Also RTS low, Tx Interrupt disabled
+        sta ACIA_CTRL_STATUS
         pla
-        ina
-        sta ACIA_DATA   ; write character
-
         rts
+;-------------------------------------------------------
 
-; Custom Delay loop
-; delay for log enough to send 1 char (10bits) at 9600 baud
-; Clk is 1MHz (1 clock cycle = 1us)
-; so delay needs to be 10*1/9600 seconds = 1042us
-tx_delay:
-        phx
-        ldx #206           ; 206 * 5us = 1030us (Plus some(20) for jsr(6), phx(3), ldx(2), plx(3) and rts(6) )
-tx_delay_loop:
-        dex                ; 2 instr cycles  = 2us
-        bne tx_delay_loop  ; 3 instr cycles  = 5us
-        plx
+;-------------------------------------------------------
+; subroutine to send 1 char - in Accumulator
+send_char:
+        pha                     ; Save accum
+wait_tdre1:
+        ; wait for TDRE to be high
+        lda ACIA_CTRL_STATUS
+        and #ACIA_STATUS_TDRE
+        beq wait_tdre1
+        
+        pla                     ; Get acc back
+        sta ACIA_TX_RX          ; and write out
         rts
+;-------------------------------------------------------
+
 
 msg_hello: .byte "Hello World",$0D,$0A,$00
 
