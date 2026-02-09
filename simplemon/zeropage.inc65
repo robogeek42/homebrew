@@ -1,0 +1,53 @@
+; Zeropage variables
+RES      = $20	; 2 bytes
+R0       = $22	; 2 bytes
+R1       = $24	; 2 bytes
+R2       = $26 	; 2 bytes
+
+TMP0     = $28	; 2 bytes
+TMP1     = $2A	; 2 bytes
+TMP2     = $2C	; 2 bytes
+BCD_IN   = $2E 	; 1 byte
+ZP_COPY_CURS = $2F ; 2 bytes
+
+ZP_CURSOR   = $31    ; Cursor char to print 0=cursor off
+
+; ZP_TMPs used by VDP blit, SD, sprite input parameter, print, 
+ZP_TMP0     = $32	; 2 bytes
+ZP_TMP2     = $34	; 2 bytes
+
+;-----------------------------------------------------------
+; For keyboard scan routine
+; 4 bytes
+; ASCII char of character pressed
+KBD_CHAR       = $36
+KBD_CHAR_LAST  = $37
+; Flags of Shift/Ctrl etc. as a bit-mask
+KBD_FLAGS      = $38
+; Other keys (Function, Return, Del, Cursor) as a bit-mask
+KBD_SPECIAL    = $39
+
+KBD_ROW     = $3A
+KBD_COL     = $3B
+
+;-----------------------------------------------------------
+; Output LIST to SD card if !=0
+;
+OUT_LIST_SD = $3C
+
+;-----------------------------------------------------------
+; for Dolo Miah's SD card and FAT16 driver
+; SD card driver parameters
+; File system parameters
+fs_bootsect    = $44        ; 4 Start of partition (usually 0x0000)
+fs_fatsect     = $48        ; 4 Start of FAT tables
+fs_rootsect    = $4C        ; 4 Start of Root Directory
+fs_datasect    = $50        ; 4 Start of Data Area
+fs_dirsect     = $54        ; 4 Current directory
+
+sd_slo         = $E0        ; 1 Sector pointer low
+sd_shi         = $E1        ; 1 Sector pointer high
+sd_sect        = $E2        ; 4 SD Card sector address
+sd_addr        = $E6        ; 4 SD Card byte address
+;-----------------------------------------------------------
+
