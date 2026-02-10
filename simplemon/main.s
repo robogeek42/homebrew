@@ -22,9 +22,11 @@ main:
             ; Intialise serial
             JSR acia_init
 
+send_message:
             ld16 R0, msg_hello
             JSR acia_puts
 
-            jmp main
+            jmp send_message
 
-msg_hello:      .byte "Hello World", $0D, $0A
+msg_hello:
+            .byte "Hello World", $0D, $0A, $00
